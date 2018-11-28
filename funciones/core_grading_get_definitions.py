@@ -4,6 +4,7 @@ import requests
 from requests import session
 from bs4 import BeautifulSoup
 import json
+from datetime import datetime
 
 
 def main():
@@ -109,7 +110,8 @@ def core_grading_get_definitions(cmid):
                 undef['rubric']['rubric_criteria'].append(criteria)
             unarea['definitions'].append(undef)
             obj['areas'].append(unarea)
-            print(obj)
+            # print(obj)
+            guardarenarchivojson(obj)
     elif r.status_code == 404:
         print('ERROR! No se ha encontrado ninguna tarea con ese id')
         sys.exit()
@@ -119,12 +121,12 @@ def core_grading_get_definitions(cmid):
 
 
 def guardarenarchivo(data):
-    with open(destino, 'w') as f:
+    with open(destino+datetime.now+'.txt', 'w') as f:
         print(data, file=f)
 
 
 def guardarenarchivojson(data):
-    with open(destino, 'w', encoding='utf8') as json_file:
+    with open(destino+datetime.now+'.json', 'w', encoding='utf8') as json_file:
         json.dump(data, json_file, ensure_ascii=False)
 
 

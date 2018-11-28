@@ -14,7 +14,7 @@ def main():
         print('ERROR! Parámetros incorrectos')
         print('Formato de llamada: core_grading_get_definitions.py baseURL user pass courseid pathJSONResultado')
         str1 = 'Ejemplo de llamada: core_grading_get_definitions.py'
-        str2 = ' http://localhost/moodle/ profesor2 Profesor2* 5 D:\\resultscraper.json'
+        str2 = ' http://localhost/moodle/ profesor2 Profesor2* 2 D:\\resultscraper.json'
         print(str1 + str2)
         sys.exit()
     else:
@@ -74,26 +74,28 @@ def core_enrol_get_enrolled_users(courseid):
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, 'html.parser')
         tablaparticipantes = soup.find("table", {"id": "participants"})
-        for unparticipante in tablaparticipantes.contents[1]:
-            enlaces = unparticipante.findAll('a')
-            for elem in enlaces:
-                if 'href' in elem.attrs:
-                    href = elem.attrs['href']
-                    if 'user/view.php?id=' in href:
-                        for unparam in href.split('?')[1].split('&'):
-                            if 'id' in unparam:
-                                id = int(unparam.split('=')[1])
-                            elif 'course' in unparam:
-                                course = int(unparam.split('=')[1])
-                        r = sesion.get(href)
-                        soup = BeautifulSoup(r.text, 'html.parser')
-
-                        print('')
-
-
-
+        if tablaparticipantes.contents[1]:
+            for unparticipante in tablaparticipantes.contents[1]:
+                enlaces = unparticipante.findAll('a')
+                for elem in enlaces:
+                    if 'href' in elem.attrs:
+                        href = elem.attrs['href']
+                        if 'user/view.php?id=' in href:
+                            for unparam in href.split('?')[1].split('&'):
+                                if 'id' in unparam:
+                                    id = int(unparam.split('=')[1])
+                                    print('Id del participante: '+str(id))
+                                elif 'course' in unparam:
+                                    course = int(unparam.split('=')[1])
+                                    print('Id del curso: ' + str(course))
+                            r = sesion.get(href)
+                            soup = BeautifulSoup(r.text, 'html.parser')
+                            guardarenarchivo(soup)
+        else:
+            print('ERROR! El usuario logueado no pertenece a ese curso')
+            sys.exit()
         # guardarenarchivo(tablaparticipantes)
-        temp = soup.findAll('a')
+        # temp = soup.findAll('a')
         # href = ''
         # for elem in temp:
         #     if 'href' in elem.attrs:
