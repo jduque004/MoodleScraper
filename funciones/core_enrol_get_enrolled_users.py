@@ -69,7 +69,7 @@ def getuserid():
 
 def core_enrol_get_enrolled_users(courseid):
     users = []
-    r = sesion.get(baseurl + 'user/index.php?id='+courseid)
+    r = sesion.get(baseurl + 'user/index.php?id='+courseid+'&perpage=5000')
     # /user/index.php?&id=2&perpage=5000 Si no muestra todos
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -81,16 +81,146 @@ def core_enrol_get_enrolled_users(courseid):
                     if 'href' in elem.attrs:
                         href = elem.attrs['href']
                         if 'user/view.php?id=' in href:
+                            userid = 0
                             for unparam in href.split('?')[1].split('&'):
                                 if 'id' in unparam:
-                                    id = int(unparam.split('=')[1])
-                                    print('Id del participante: '+str(id))
+                                    userid = int(unparam.split('=')[1])
+                                    print('Id del participante: '+str(userid))
                                 elif 'course' in unparam:
                                     course = int(unparam.split('=')[1])
                                     print('Id del curso: ' + str(course))
                             r = sesion.get(href)
                             soup = BeautifulSoup(r.text, 'html.parser')
-                            guardarenarchivo(soup)
+                            perfil = soup.find("div", {"class": "userprofile"})
+
+                            # profileimageurl. Podría conseguir la imagen pequeña tambien si cambio f1 por f2
+                            profileimageurl = perfil.find("img", {"class": "userpicture"})
+                            if 'src' in profileimageurl.attrs:
+                                profileimageurl = profileimageurl.attrs['src'].split('?')[0]
+                                print('Imagen: ' + profileimageurl)
+
+                            # fullname
+                            fullname = perfil.find("div", {"class": "page-header-headings"})
+                            if fullname:
+                                fullname = fullname.text
+                                print('Nombre completo: ' + fullname)
+
+                            # description
+                            description = perfil.find("div", {"class": "description"})
+                            if description:
+                                description = description.text
+                                print('Descripción: ' + description)
+
+                            # enrolledcourses, firstaccess & lastaccess
+                            if userid != 0:
+                                href = baseurl + 'user/profile.php?id=' + str(userid)
+                                r = sesion.get(href)
+                                soup = BeautifulSoup(r.text, 'html.parser')
+
+                                # enrolledcourses
+                                a = soup.findAll("a")
+                                for unA in a:
+                                    if 'href' in unA.attrs:
+                                        href = unA.attrs['href']
+                                        patron = 'user/view.php?id=' + str(userid) + '&course='
+                                        if href and patron in href:
+                                            index = href.index('&course=')
+                                            id = int(href[index + 8:None])
+                                            fullname = unA.text
+                                            print('Un curso:   Id=' + str(id) + '   Fullname='+fullname)
+
+                                # firstaccess & lastaccess
+                                allli = soup.findAll("li", {"class": "contentnode"})
+                                for unLi in allli:
+                                    dt = unLi.find('dt').text
+                                    dd = unLi.find('dd')
+                                    if dt and dd:
+                                        if 'Primer acceso' in dt or 'First access' in dt or 'Lehen sarrera' in dt:
+                                            firstaccess = dd.text
+                                            print('Primer acceso: '+firstaccess)
+                                        if 'Last access' in dt or 'Último acceso' in dt or 'Azken sarrera' in dt:
+                                            lastaccess = dd.text
+                                            print('Último acceso: '+lastaccess)
+
+                            # bloque profile_tree
+                            profile_tree = perfil.find("div", {"class": "profile_tree"})
+                            if profile_tree:
+                                for unaSeccion in profile_tree.contents:
+                                    aux = unaSeccion.findAll("li", {"class": "contentnode"})
+                                    if aux:
+                                        for unLi in aux:
+                                            dt = unLi.find('dt').text
+                                            dd = unLi.find('dd')
+                                            if dt and dd:
+
+                                                #email
+                                                if 'mail' in dt:
+                                                    email = dd.find("a").text
+                                                    print('Email: ' + email)
+
+                                                # country
+                                                elif 'Country' in dt or 'País' in dt or 'Herrialdea' in dt:
+                                                    country = dd.text
+                                                    print('País: ' + country)
+
+                                                # city
+                                                elif 'City' in dt or 'Ciudad' in dt or 'Hiria' in dt:
+                                                    city = dd.text
+                                                    print('Ciudad: ' + city)
+
+                                                # Web
+                                                elif 'web' in dt.lower():
+                                                    url = dd.find("a").text
+                                                    print('Página web: ' + url)
+
+                                                # ICQ
+                                                elif 'ICQ' in dt:
+                                                    icq = dd.find("a").text
+                                                    print('Número de ICQ: ' + icq)
+
+                                                # Skype
+                                                elif 'Skype' in dt:
+                                                    skype = dd.find("a").text
+                                                    print('ID Skype: ' + skype)
+
+                                                # Yahoo
+                                                elif 'Yahoo' in dt:
+                                                    yahoo = dd.find("a").text
+                                                    print('ID Yahoo: ' + yahoo)
+
+                                                # AIM
+                                                elif 'AIM' in dt:
+                                                    aim = dd.find("a").text
+                                                    print('ID AIM: ' + aim)
+
+                                                # MSN
+                                                elif 'MSN' in dt:
+                                                    msn = dd.text
+                                                    print('ID MSN: ' + msn)
+
+                                                # groups
+                                                elif 'Group' in dt or 'Grupo' in dt or 'Taldea' in dt:
+                                                    for unGrupo in dd.findAll('a'):
+                                                        if 'href' in unGrupo.attrs:
+                                                            href = unGrupo.attrs['href']
+                                                            index = href.index('group=')
+                                                            id = int(href[index + 6:None])
+                                                            name = unGrupo.text
+                                                            print('Un grupo. Id: ' + str(id) + '   Nombre: ' + name)
+
+                                                # roles
+                                                elif 'Roles' in dt or 'Rolak' in dt:
+                                                    for unRol in dd.findAll('a'):
+                                                        if 'href' in unRol.attrs:
+                                                            href = unRol.attrs['href']
+                                                            index = href.index('roleid=')
+                                                            id = int(href[index + 7:None])
+                                                            name = unRol.text
+                                                            print('Un rol. Id: ' + str(id) + '   Nombre: ' + name)
+
+                            # guardarenarchivo(perfil)
+                            print('')
+                        break
         else:
             print('ERROR! El usuario logueado no pertenece a ese curso')
             sys.exit()
@@ -134,7 +264,7 @@ def core_enrol_get_enrolled_users(courseid):
 
 
 def guardarenarchivo(data):
-    with open(destino+'.txt', 'w', encoding='utf8') as f:
+    with open(destino+str(time.time())+'.txt', 'w', encoding='utf8') as f:
         print(data, file=f)
 
 
