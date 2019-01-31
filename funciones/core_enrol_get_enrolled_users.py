@@ -70,7 +70,7 @@ def getuserid():
 def core_enrol_get_enrolled_users(courseid):
     users = []
     r = sesion.get(baseurl + 'user/index.php?id='+courseid+'&perpage=5000')
-    # /user/index.php?&id=2&perpage=5000 Si no muestra todos
+    # Le pongo &perpage=5000 por si hay muchos usuarios
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, 'html.parser')
         tablaparticipantes = soup.find("table", {"id": "participants"})

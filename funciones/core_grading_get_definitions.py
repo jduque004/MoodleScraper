@@ -121,12 +121,12 @@ def core_grading_get_definitions(cmid):
 
 
 def guardarenarchivo(data):
-    with open(destino+datetime.now+'.txt', 'w') as f:
+    with open(destino+str(datetime.now().microsecond)+'.txt', 'w') as f:
         print(data, file=f)
 
 
 def guardarenarchivojson(data):
-    with open(destino+datetime.now+'.json', 'w', encoding='utf8') as json_file:
+    with open(destino+str(datetime.now().microsecond)+'.json', 'w', encoding='utf8') as json_file:
         json.dump(data, json_file, ensure_ascii=False)
 
 
