@@ -5,11 +5,14 @@ from requests import session
 from bs4 import BeautifulSoup
 import json
 import time
+import datetime
 
 
 def main():
     global baseurl
     global destino
+    global tiempoinicio
+    tiempoinicio = datetime.datetime.now()
     if len(sys.argv) < 6:
         print('ERROR! Parámetros incorrectos')
         print('Formato de llamada: core_grading_get_definitions.py baseURL user pass courseid pathJSONResultado')
@@ -29,7 +32,7 @@ def main():
             print('ERROR! No se ha podido completar el login correctamente. Compruebe la url, el usuario y el password')
         else:
             print('Se ha logueado correctamente. El id del usuario logueado es: '+str(userid))
-            core_enrol_get_enrolled_users(courseid)
+            core_enrol_get_enrolled_users2(courseid)
 
 
 def login(user, pwd):
@@ -212,6 +215,131 @@ def core_enrol_get_enrolled_users(courseid):
         else:
             print('ERROR! El usuario logueado no pertenece a ese curso')
             sys.exit()
+    elif r.status_code == 404:
+        print('ERROR! No se ha encontrado ninguna tarea con ese id')
+        sys.exit()
+    else:
+        print('ERROR: ' + str(r.status_code) + ' ' + r.reason)
+        sys.exit()
+
+
+def core_enrol_get_enrolled_users2(courseid):
+    titulos = ["Email address", "Country", "City/town", "Web page", "ICQ number", "Skype ID", "Yahoo ID", "AIM ID",
+               "MSN ID", "First access to site", "Last access to site"]
+    etiquetasjson = ["email", "country", "city", "url", "icq", "skype", "yahoo", "aim", "msn", "firstaccess",
+                     "lastaccess"]
+    users = []
+    r = sesion.get(baseurl + 'user/index.php?id='+courseid+'&perpage=5000&lang=en')
+    # Le pongo &perpage=5000 por si hay muchos usuarios
+    if r.status_code == 200:
+        soup = BeautifulSoup(r.text, 'html.parser')
+        # #participants > tbody > tr > td.cell.c1 > a
+        participantes = soup.select('#participants > tbody > tr > td.cell.c1 > a')
+        for unParticipante in participantes:
+            if 'href' in unParticipante.attrs:
+                href = unParticipante.attrs['href']
+                if 'user/view.php?id=' in href:
+                    user = dict()
+                    user['id'] = 0
+                    for unparam in href.split('?')[1].split('&'):
+                        if 'id' in unparam:
+                            user['id'] = int(unparam.split('=')[1])
+                    r = sesion.get(href+'&lang=en')
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    perfil = soup.find("div", {"class": "userprofile"})
+
+                    # profileimageurl
+                    profileimageurl = perfil.find("img", {"class": "userpicture"})
+                    if 'src' in profileimageurl.attrs:
+                        user['profileimageurl'] = profileimageurl.attrs['src'].split('?')[0]
+                        user['profileimageurlsmall'] = user['profileimageurl'][:-1]+'2'
+
+                    # fullname
+                    fullname = perfil.find("div", {"class": "page-header-headings"})
+                    if fullname:
+                        user['fullname'] = fullname.text
+
+                    # description
+                    description = perfil.find("div", {"class": "description"})
+                    if description:
+                        user['description'] = description.text
+
+                    # Con selectores
+                    user['groups'] = []
+                    user['roles'] = []
+                    elementos = soup.select('div.profile_tree > section > ul > li > dl')
+                    for unElemento in elementos:
+                        dt = unElemento.find('dt').text
+                        dd = unElemento.find('dd')
+                        if dt and dd:
+                            if dt in titulos:
+                                index = titulos.index(dt)
+                                user[etiquetasjson[index]] = dd.text
+
+                            # groups. En la 3.5 no funciona porque no tiene enlaces
+                            elif 'Group' in dt:
+                                for unGrupo in dd.findAll('a'):
+                                    if 'href' in unGrupo.attrs:
+                                        href = unGrupo.attrs['href']
+                                        index = href.index('group=')
+                                        group = dict()
+                                        group['id'] = int(href[index + 6:None])
+                                        group['name'] = unGrupo.text
+                                        user['groups'].append(group)
+
+                            # roles
+                            elif 'Roles' in dt:
+                                for unRol in dd.findAll('a'):
+                                    if 'href' in unRol.attrs:
+                                        href = unRol.attrs['href']
+                                        index = href.index('roleid=')
+                                        role = dict()
+                                        role['id'] = int(href[index + 7:None])
+                                        role['name'] = unRol.text
+                                        user['roles'].append(role)
+
+                    # enrolledcourses, firstaccess & lastaccess
+                    href = baseurl + 'user/profile.php?id=' + str(user['id'])+'&lang=en'
+                    r = sesion.get(href)
+                    soup = BeautifulSoup(r.text, 'html.parser')
+
+                    # firstaccess & lastaccess
+                    allli = soup.findAll("li", {"class": "contentnode"})
+                    for unLi in allli:
+                        dt = unLi.find('dt').text
+                        dd = unLi.find('dd')
+                        if dt and dd:
+                            pattern = '%A, %d %B %Y, %I:%M %p'
+                            if 'First access' in dt:
+                                if 'Never' not in dd.text:
+                                    aux = dd.text.split('(')[0]
+                                    aux = aux[:-2]
+                                    objdate = datetime.datetime.strptime(aux, pattern)
+                                    user['firstaccess'] = objdate.timestamp()
+                            if 'Last access' in dt:
+                                if 'Never' not in dd.text:
+                                    aux = dd.text.split('(')[0]
+                                    aux = aux[:-2]
+                                    objdate = datetime.datetime.strptime(aux, pattern)
+                                    user['lastaccess'] = objdate.timestamp()
+
+                    # enrolledcourses
+                    user['enrolledcourses'] = []
+                    a = soup.findAll("a")
+                    for unA in a:
+                        if 'href' in unA.attrs:
+                            href = unA.attrs['href']
+                            patron = 'user/view.php?id=' + str(user['id']) + '&course='
+                            if href and patron in href:
+                                course = dict()
+                                index = href.index('&course=')
+                                course['id'] = int(href[index + 8:None])
+                                course['fullname'] = unA.text
+                                user['enrolledcourses'].append(course)
+
+                    users.append(user)
+        print('Tiempo que ha tardado: ' + str(datetime.datetime.now()-tiempoinicio))
+        guardarenarchivojson(users)
     elif r.status_code == 404:
         print('ERROR! No se ha encontrado ninguna tarea con ese id')
         sys.exit()
